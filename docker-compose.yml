@@ -1,21 +1,44 @@
 version: '3.8'
 
 services:
-  gaof_weather:
+  backend:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
-    networks:
-      - gaof_network
-    ports:
-      - "8000:8000"
+    container_name: gaof-be
     volumes:
-      - .:/app
-    env_file:
-      - .env
+      - ./backend:/app
     environment:
       - UVICORN_WORKERS=2
-    command: [ "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000" ]
+      - MODULE_NAME=gaof.main
+      - PORT=8001
+    env_file:
+      - .env-docker
+    ports:
+      - "8001:8001"
+    command: [ "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001" ]
+    depends_on:
+      - mongodb
 
-networks:
-  gaof_network:
+  frontend:
+    build:
+      context: ./frontend
+    container_name: gaof-fe
+    volumes:
+      - ./frontend:/app
+    environment:
+      - PORT=8000
+    ports:
+      - "8000:8000"
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "8000"]
+    depends_on:
+      - backend
+
+  mongodb:
+    image: bitnami/mongodb:7.0.1
+    container_name: gaof-db
+    # environment:
+      # MONGODB_ROOT_USERNAME: admin
+      # MONGODB_ROOT_PASSWORD: admin-password
+    ports:
+      - "9000:27017"
