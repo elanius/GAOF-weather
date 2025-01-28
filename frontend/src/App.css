@@ -1,7 +1,7 @@
 #root {
-  max-width: 1280px;
+  /* max-width: 1280px; */
   margin: 0 auto;
-  padding: 2rem;
+  /* padding: 2rem; */
   text-align: center;
 }
 
@@ -39,4 +39,26 @@
 
 .read-the-docs {
   color: #888;
+}
+
+.app-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* MapPanel should take 70% of the width */
+.map-panel {
+  width: 70%;
+  height: 100%;
+}
+
+/* SidePanel should take 30% of the width */
+.side-panel {
+  width: 30%;
+  height: 100%;
+  border-left: 1px solid #ccc;
+  background-color: #f9f9f9;
+  display: flex;
+  flex-direction: column;
 }

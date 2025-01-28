@@ -1,3 +1,4 @@
+from dataclasses import asdict
 import os
 from typing import Dict
 
@@ -28,7 +29,7 @@ class Zones:
         return self._next_id
 
     async def add_zone(self, zone: ZoneBase):
-        await self._zones_collection.insert_one(zone.to_dict())
+        await self._zones_collection.insert_one(asdict(zone))
         # if zone.name in self._zone_store:
         #     raise ZoneException(f"Zone with name {zone.name} already exists")
 

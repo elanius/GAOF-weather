@@ -7,6 +7,8 @@ router = APIRouter()
 OPEN_WEATHER_API_KEY = os.getenv("OPEN_WEATHER_API_KEY")
 
 
+# example
+# http://127.0.0.1:8001/weather?lat=40.4774&lon=-74.2591
 @router.get("/weather")
 def get_weather(lat: float, lon: float):
     if not OPEN_WEATHER_API_KEY:
@@ -24,7 +26,7 @@ def get_weather(lat: float, lon: float):
 
 
 # example
-# http://127.0.0.1:8000/weather_zone?lon_left=-74.2591&lat_bottom=40.4774&lon_right=-73.7002&lat_top=40.9176
+# http://127.0.0.1:8001/weather_zone?lon_left=-74.2591&lat_bottom=40.4774&lon_right=-73.7002&lat_top=40.9176
 @router.get("/weather_zone")
 def get_weather_zone(lon_left: float, lat_bottom: float, lon_right: float, lat_top: float):
     if not OPEN_WEATHER_API_KEY:

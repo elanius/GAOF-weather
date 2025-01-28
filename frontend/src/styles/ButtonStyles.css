@@ -1,0 +1,42 @@
+.button {
+    background-color: transparent;
+    color: #333;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    height: 40px;
+}
+
+.button:hover, .button.pressed {
+    background-color: #5892fc;
+}
+
+/* .button:disabled {
+    background-color: #b4cbf7;
+} */
+
+.button.delete {
+    background-color: transparent;
+    color: #dc3545;
+}
+
+.button.delete:hover {
+    background-color: #f8d7da;
+}
+
+.button.edit, .button.accept {
+    background-color: transparent;
+    color: #333;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-left: 8px;
+    height: 40px;
+}
+
+.button.edit:hover, .button.accept:hover {
+    background-color: #e6e6e6;
+}

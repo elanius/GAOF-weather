@@ -10,11 +10,13 @@ class GeoPoint:
 
 
 class ZoneType(StrEnum):
+    EMPTY = "empty"
     WIND = "wind"
-    PERCEPTION = "perception"
-    SPEED_LIMIT = "speed_limit"
-    ALTITUDE_LIMIT = "altitude_limit"
-    NO_FLY = "no_fly"
+    RAIN = "rain"
+    VISIBILITY = "visibility"
+    # SPEED_LIMIT = "speed_limit"
+    # ALTITUDE_LIMIT = "altitude_limit"
+    # NO_FLY = "no_fly"
 
 
 @dataclass
@@ -25,6 +27,7 @@ class ZoneBBox:
 
 @dataclass
 class ZoneBase:
+    id: str
     name: str
     zone_type: ZoneType
     bbox: ZoneBBox
@@ -37,11 +40,24 @@ class ZoneBase:
 
 @dataclass
 class WindZone(ZoneBase):
-    wind_speed: float
+    wind_speed: float  # meter/second
     wind_direction: float
+
+    def __post_init__(self):
+        self.zone_type = ZoneType.WIND
 
 
 @dataclass
-class PerceptionZone(ZoneBase):
-    visibility: float
-    precipitation: float
+class RainZone(ZoneBase):
+    precipitation: float  # mm/hour
+
+    def __post_init__(self):
+        self.zone_type = ZoneType.RAIN
+
+
+@dataclass
+class VisibilityZone(ZoneBase):
+    distance: int  # meters
+
+    def __post_init__(self):
+        self.zone_type = ZoneType.VISIBILITY
