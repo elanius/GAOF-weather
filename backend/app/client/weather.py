@@ -2,7 +2,7 @@ import os
 import requests
 from fastapi import HTTPException
 
-from app.db.zone_types import GeoPoint, RainZone, VisibilityZone, WindZone, ZoneBBox, ZoneBase, ZoneType
+from app.types.zone_types import GeoPoint, RainPayload, VisibilityPayload, WindPayload, ZoneBBox, Zone, ZoneType
 
 
 OPEN_WEATHER_API_KEY = os.getenv("OPEN_WEATHER_API_KEY")
@@ -30,7 +30,7 @@ def get_weather_by_coordinates(lat: float, lon: float):
     return response.json()
 
 
-def create_weather_zone(zone_id: str, zone_rect: list[float], zone_name: str, zone_type: ZoneType) -> ZoneBase:
+def create_weather_zone(zone_id: str, zone_rect: list[float], zone_name: str, zone_type: ZoneType) -> Zone:
     if len(zone_rect) != 4:
         raise HTTPException(status_code=400, detail="Invalid zone rectangle")
 
@@ -42,14 +42,14 @@ def create_weather_zone(zone_id: str, zone_rect: list[float], zone_name: str, zo
     weather_data = get_weather_by_bbox(zone_bbox)
 
     if zone_type == ZoneType.EMPTY:
-        return ZoneBase(
+        return Zone(
             id=zone_id,
             name=zone_name,
             zone_type=zone_type,
             bbox=zone_bbox,
         )
     elif zone_type == ZoneType.WIND:
-        return WindZone(
+        return WindPayload(
             id=zone_id,
             name=zone_name,
             zone_type=zone_type,
@@ -58,7 +58,7 @@ def create_weather_zone(zone_id: str, zone_rect: list[float], zone_name: str, zo
             wind_direction=weather_data["wind"]["deg"],
         )
     elif zone_type == ZoneType.RAIN:
-        return RainZone(
+        return RainPayload(
             id=zone_id,
             name=zone_name,
             zone_type=zone_type,
@@ -66,7 +66,7 @@ def create_weather_zone(zone_id: str, zone_rect: list[float], zone_name: str, zo
             precipitation_1h=weather_data["rain"]["1h"] if "rain" in weather_data else 0,
         )
     elif zone_type == ZoneType.VISIBILITY:
-        return VisibilityZone(
+        return VisibilityPayload(
             id=zone_id,
             name=zone_name,
             zone_type=zone_type,

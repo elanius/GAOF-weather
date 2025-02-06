@@ -1,18 +1,39 @@
 from fastapi import APIRouter
-from app.db.zone_types import ZoneType
-from app.db.zones import ZoneException, zones_db
-from app.client.weather import create_weather_zone
+from app.types.zone_types import ZoneType, create_zone_bbox, zone_factory
+from app.client.weather import get_weather_by_bbox
 from app.client.mongo import mongo_db
 
 router = APIRouter()
 
 
 @router.get("/near_zones")
-def near_zones(lat: float, lon: float, radius: float):
+async def near_zones(lat: float, lon: float, radius: float):
+    """
+    Find zones within a specified radius from a given latitude and longitude.
+    This function retrieves all zones from the database and checks if their center points
+    fall within the specified radius from the given latitude and longitude. The center point
+    of a zone is calculated as the midpoint between its south-west and north-east bounding box coordinates.
+    Args:
+        lat (float): Latitude of the center point to search from.
+        lon (float): Longitude of the center point to search from.
+        radius (float): Radius within which to search for zones.
+    Returns:
+        list: A list of zones that fall within the specified radius.
+    Note:
+        This function uses a naive approach to calculate the distance, which is checked against
+        the middle point of each zone's bounding box.
+    """
 
-    found_zones = zones_db.get_near_zones(lat, lon, radius)
+    zones = await mongo_db.get_all_zones()
+    zones_in_radius = []
+    for zone in zones:
+        zone_center_lat = (zone.bbox.south_west.lat + zone.bbox.north_east.lat) / 2
+        zone_center_lon = (zone.bbox.south_west.lon + zone.bbox.north_east.lon) / 2
+        distance = ((zone_center_lat - lat) ** 2 + (zone_center_lon - lon) ** 2) ** 0.5
+        if distance <= radius:
+            zones_in_radius.append(zone)
 
-    return found_zones
+    return zones_in_radius
 
 
 @router.get("/list_zones")
@@ -64,19 +85,19 @@ async def create_zone(zone_rect: list[float], zone_name: str = "", zone_type: Zo
         dict: A dictionary with the status of the operation and weather data.
               If successful, returns {"status": "success", "weather": weather_data}.
               If an error occurs, returns {"status": "error", "message": str(e)}.
-
-    Raises:
-        ZoneException: If there is an error adding the zone to the database.
     """
 
     try:
-        zone = create_weather_zone("", zone_rect, zone_name, zone_type)
+        zone = zone_factory(zone_id="", zone_name=zone_name, zone_type=zone_type, zone_bbox=create_zone_bbox(zone_rect))
+        if zone.zone_type != ZoneType.EMPTY:
+            weather = get_weather_by_bbox(zone.bbox)
+            zone.set_payload(weather)
         zone = await mongo_db.insert_zone(zone)
 
-    except ZoneException as e:
+    except Exception as e:
         return {"status": "error", "message": str(e)}
 
-    return zone.to_dict()
+    return zone
 
 
 @router.put("/edit_zone")
@@ -98,11 +119,21 @@ async def edit_zone(zone_id: str, zone_type: ZoneType, zone_name: str = ""):
         if (zone := await mongo_db.get_zone(zone_id)) is None:
             return {"status": "error", "message": "Zone not found"}
 
-        rect = [zone.bbox.south_west.lat, zone.bbox.south_west.lon, zone.bbox.north_east.lat, zone.bbox.north_east.lon]
-        new_zone = create_weather_zone(zone.id, rect, zone_name, zone_type)
+        weather = None
+        if zone_type != ZoneType.EMPTY:
+            weather = get_weather_by_bbox(zone.bbox)
+
+        new_zone = zone_factory(
+            zone_id=zone_id,
+            zone_name=zone_name,
+            zone_type=zone_type,
+            zone_bbox=zone.bbox,
+            payload=weather,
+        )
+
         if await mongo_db.update_zone(new_zone) is False:
             return {"status": "error", "message": "Zone not found"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
-    return {"status": "success"}
+    return new_zone

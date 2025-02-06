@@ -9,6 +9,7 @@ export enum ZoneType {
     wind = "wind",
     rain = "rain",
     visibility = "visibility",
+    temperature = "temperature",
 }
 
 type Zone = {
@@ -18,6 +19,7 @@ type Zone = {
     isEditing: boolean;
     isCreating: boolean;
     type: ZoneType;
+    payload?: { [key: string]: any };
 };
 
 type ZoneContextType = {
@@ -56,6 +58,7 @@ export const ZoneProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     isEditing: false,
                     isCreating: false,
                     type: zone.zone_type as ZoneType,
+                    payload: zone.payload,
                 };
                 return acc;
             }, {});
@@ -105,6 +108,7 @@ export const ZoneProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     isEditing: true,
                     isCreating: true,
                     type: newZone.zone_type,
+                    payload: newZone.payload,
                 },
             }));
             selectZone(newZone.id);
@@ -130,13 +134,15 @@ export const ZoneProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const editZone = async (id: string, newName: string, newType: ZoneType) => {
         try {
-            await axios.put(`/edit_zone?zone_id=${id}&zone_name=${newName}&zone_type=${newType}`);
+            const response = await axios.put(`/edit_zone?zone_id=${id}&zone_name=${newName}&zone_type=${newType}`);
+            const updatedZone = response.data;
             setZones({
                 ...zones,
                 [id]: {
                     ...zones[id],
-                    name: newName || zones[id].name,
-                    type: newType || zones[id].type,
+                    name: updatedZone.name,
+                    type: updatedZone.zone_type,
+                    payload: updatedZone.payload,
                     isEditing: false,
                     isCreating: false,
                 },
@@ -144,6 +150,7 @@ export const ZoneProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (isCreatingZone) {
                 setIsCreatingZone(false);
             }
+            selectZone(id); // Trigger re-render by selecting the updated zone
         } catch (error) {
             console.error("Error editing zone:", error);
         }

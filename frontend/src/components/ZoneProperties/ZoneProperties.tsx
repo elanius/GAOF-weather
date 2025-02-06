@@ -2,15 +2,15 @@ import React, { useState, useEffect } from "react";
 import "./ZoneProperties.css";
 import "../../styles/ButtonStyles.css";
 import { useZoneContext, ZoneType } from "../../context/ZoneContext";
+import ZoneProperty from "./ZoneProperty";
 
 const ZoneProperties: React.FC = () => {
-    const { selectedZoneId, editZone, deleteZone, selectedZone } = useZoneContext();
+    const { selectedZoneId, editingZone, editZone, deleteZone, selectedZone } = useZoneContext();
     const zone = selectedZone();
     const [newZoneName, setNewZoneName] = useState<string>(zone ? zone.name : "");
     const [zoneType, setZoneType] = useState<string>(zone ? zone.type : "");
 
     useEffect(() => {
-        console.log("Updated selectedZoneId:", selectedZoneId);
         if (zone) {
             setNewZoneName(zone.name);
             setZoneType(zone.type);
@@ -26,7 +26,6 @@ const ZoneProperties: React.FC = () => {
     };
 
     const handleSave = () => {
-        console.log("Selected Zone ID:", selectedZoneId);
         editZone(selectedZoneId!, newZoneName, zoneType as ZoneType);
     };
 
@@ -35,7 +34,7 @@ const ZoneProperties: React.FC = () => {
             if (zone.isCreating) {
                 deleteZone(selectedZoneId!);
             } else if (zone.isEditing) {
-                zone.isEditing = false;
+                editingZone(selectedZoneId!, false);
                 setNewZoneName(zone.name);
                 setZoneType(zone.type);
             }
@@ -77,22 +76,16 @@ const ZoneProperties: React.FC = () => {
                                 </select>
                             </td>
                         </tr>
-                        <tr>
-                            <td className="property-name">SW Corner Latitude</td>
-                            <td className="property-value">{zone.bounds.getSouthWest().lat}</td>
-                        </tr>
-                        <tr>
-                            <td className="property-name">SW Corner Longitude</td>
-                            <td className="property-value">{zone.bounds.getSouthWest().lng}</td>
-                        </tr>
-                        <tr>
-                            <td className="property-name">NE Corner Latitude</td>
-                            <td className="property-value">{zone.bounds.getNorthEast().lat}</td>
-                        </tr>
-                        <tr>
-                            <td className="property-name">NE Corner Longitude</td>
-                            <td className="property-value">{zone.bounds.getNorthEast().lng}</td>
-                        </tr>
+
+                        <ZoneProperty propName="SW Corner Latitude" propValue={zone.bounds.getSouthWest().lat} />
+                        <ZoneProperty propName="SW Corner Longitude" propValue={zone.bounds.getSouthWest().lng} />
+                        <ZoneProperty propName="NE Corner Latitude" propValue={zone.bounds.getNorthEast().lat} />
+                        <ZoneProperty propName="NE Corner Longitude" propValue={zone.bounds.getNorthEast().lng} />
+
+                        {zone.payload &&
+                            Object.entries(zone.payload).map(([key, value]) => (
+                                <ZoneProperty propName={key} propValue={value} additionalStyle="payload" />
+                            ))}
                         {zone.isEditing && (
                             <tr>
                                 <td colSpan={2} className="property-value">

@@ -36,3 +36,12 @@
 .property-value {
     text-align: right;
 }
+
+.property-name.payload {
+    background-color: #eef8e0;
+    font-weight: bold;
+}
+
+.property-value.payload {
+    background-color: #eef8e0;
+}
