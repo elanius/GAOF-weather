@@ -6,7 +6,8 @@ import "leaflet/dist/leaflet.css";
 import "./MapPanel.css";
 
 const MapPanel: React.FC = () => {
-    const { zones, selectedZoneId, isCreatingZone, addNewZone, selectZone } = useZoneContext();
+    const { zones, selectedZoneId, isCreatingZone, isLocalizingZone, addNewZone, selectZone, localizeZone } =
+        useZoneContext();
     const mapRef = useRef<Map | null>(null);
     const [waitForAccept, setWaitForAccept] = useState(false);
 
@@ -59,6 +60,17 @@ const MapPanel: React.FC = () => {
             map.scrollWheelZoom.enable();
         };
     }, [isCreatingZone, addNewZone, waitForAccept]);
+
+    useEffect(() => {
+        if (!mapRef.current || !selectedZoneId || !isLocalizingZone) return;
+        const map = mapRef.current;
+        const zone = zones[selectedZoneId];
+        if (zone) {
+            const bounds = zone.bounds;
+            map.fitBounds(bounds, { padding: [200, 200] }); // Add padding to zoom out a little bit
+        }
+        localizeZone(selectedZoneId, false);
+    }, [selectedZoneId, zones, isLocalizingZone]);
 
     return (
         <MapContainer

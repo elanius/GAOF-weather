@@ -24,14 +24,14 @@
 .zones-table th:first-child,
 .zones-table td:first-child {
     text-align: left;
-    width: 70%; /* Set width for the first column */
+    width: 60%; /* Set width for the first column */
     border-right: none; /* Remove the vertical line */
 }
 
 .zones-table th:last-child,
 .zones-table td:last-child {
     text-align: right;
-    width: 30%; /* Set width for the second column */
+    width: 40%; /* Set width for the second column */
     border-left: none;
 }
 

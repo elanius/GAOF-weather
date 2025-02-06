@@ -26,6 +26,7 @@ type ZoneContextType = {
     zones: { [id: string]: Zone };
     selectedZoneId: string | null;
     isCreatingZone: boolean;
+    isLocalizingZone: boolean;
     creatingZone: () => void;
     addNewZone: (bounds: LatLngBounds) => void;
     selectZone: (id: string | null) => void;
@@ -33,6 +34,7 @@ type ZoneContextType = {
     editZone: (id: string, newName: string, newType: ZoneType) => void;
     deleteZone: (id: string) => void;
     selectedZone(): Zone | null;
+    localizeZone: (id: string, enable?: boolean) => void;
 };
 
 const ZoneContext = createContext<ZoneContextType | undefined>(undefined);
@@ -41,6 +43,7 @@ export const ZoneProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [zones, setZones] = useState<{ [id: string]: Zone }>({});
     const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
     const [isCreatingZone, setIsCreatingZone] = useState(false);
+    const [isLocalizingZone, setIsLocalizingZone] = useState(false);
 
     const fetchZones = async () => {
         try {
@@ -181,12 +184,18 @@ export const ZoneProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return selectedZoneId ? zones[selectedZoneId] : null;
     };
 
+    const localizeZone = (id: string, enable: boolean = true) => {
+        setIsLocalizingZone(enable);
+        selectZone(id);
+    };
+
     return (
         <ZoneContext.Provider
             value={{
                 zones,
                 selectedZoneId,
                 isCreatingZone,
+                isLocalizingZone,
                 creatingZone,
                 addNewZone,
                 selectZone,
@@ -194,6 +203,7 @@ export const ZoneProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 editZone,
                 deleteZone,
                 selectedZone,
+                localizeZone,
             }}
         >
             {children}

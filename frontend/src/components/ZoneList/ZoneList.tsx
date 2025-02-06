@@ -1,12 +1,12 @@
 import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEdit, faPlus, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faEdit, faPlus, faTrash, faMapMarkerAlt } from "@fortawesome/free-solid-svg-icons";
 import "./ZoneList.css";
 import "../../styles/ButtonStyles.css";
 import { useZoneContext } from "../../context/ZoneContext";
 
 const ZoneList: React.FC = () => {
-    const { zones, selectedZoneId, isCreatingZone, creatingZone, selectZone, deleteZone, editingZone } =
+    const { zones, selectedZoneId, isCreatingZone, creatingZone, selectZone, deleteZone, editingZone, localizeZone } =
         useZoneContext();
 
     return (
@@ -41,6 +41,15 @@ const ZoneList: React.FC = () => {
                         >
                             <td className="zone-name">{zone.name}</td>
                             <td className="zone-actions">
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        localizeZone(id);
+                                    }}
+                                    className="button edit"
+                                >
+                                    <FontAwesomeIcon icon={faMapMarkerAlt} />
+                                </button>
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
