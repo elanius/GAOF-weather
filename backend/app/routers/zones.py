@@ -9,19 +9,14 @@ router = APIRouter()
 @router.get("/near_zones")
 async def near_zones(lat: float, lon: float, radius: float):
     """
-    Find zones within a specified radius from a given latitude and longitude.
-    This function retrieves all zones from the database and checks if their center points
-    fall within the specified radius from the given latitude and longitude. The center point
-    of a zone is calculated as the midpoint between its south-west and north-east bounding box coordinates.
+    Find zones within a specified radius of a given latitude and longitude.
+
     Args:
-        lat (float): Latitude of the center point to search from.
-        lon (float): Longitude of the center point to search from.
-        radius (float): Radius within which to search for zones.
+        lat (float): The latitude of the point to search around.
+        lon (float): The longitude of the point to search around.
+        radius (float): The radius within which to search for zones.
     Returns:
-        list: A list of zones that fall within the specified radius.
-    Note:
-        This function uses a naive approach to calculate the distance, which is checked against
-        the middle point of each zone's bounding box.
+        list: A list of zones that are within the specified radius of the given point.
     """
 
     zones = await mongo_db.get_all_zones()
@@ -29,8 +24,11 @@ async def near_zones(lat: float, lon: float, radius: float):
     for zone in zones:
         zone_center_lat = (zone.bbox.south_west.lat + zone.bbox.north_east.lat) / 2
         zone_center_lon = (zone.bbox.south_west.lon + zone.bbox.north_east.lon) / 2
+        zone_radius = (
+            (zone.bbox.north_east.lat - zone_center_lat) ** 2 + (zone.bbox.north_east.lon - zone_center_lon) ** 2
+        ) ** 0.5
         distance = ((zone_center_lat - lat) ** 2 + (zone_center_lon - lon) ** 2) ** 0.5
-        if distance <= radius:
+        if distance <= radius + zone_radius:
             zones_in_radius.append(zone)
 
     return zones_in_radius
