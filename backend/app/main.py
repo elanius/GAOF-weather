@@ -2,14 +2,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.routers import root, weather, zones
+from app.background import Background
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # startup
-    yield
+    # create a background asyncio task which will periodically process the zones
+    async with Background():
+        yield
+
     # teardown
-    pass
 
 
 app = FastAPI(lifespan=lifespan)

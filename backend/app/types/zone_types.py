@@ -1,11 +1,16 @@
-import dacite
+import datetime
+import logging
 from enum import StrEnum
-from dataclasses import dataclass, asdict
-from typing import Any, Dict, Optional
+from bson import ObjectId
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
+from typing import Any, Optional
+
+# from bson import ObjectId
+
+logger = logging.getLogger(__name__)
 
 
-@dataclass
-class GeoPoint:
+class GeoPoint(BaseModel):
     lat: float
     lon: float
 
@@ -16,36 +21,41 @@ class ZoneType(StrEnum):
     RAIN = "rain"
     VISIBILITY = "visibility"
     TEMPERATURE = "temperature"
+    AUTO_GROUP = "auto_group"
     # SPEED_LIMIT = "speed_limit"
     # ALTITUDE_LIMIT = "altitude_limit"
     # NO_FLY = "no_fly"
 
 
-@dataclass
-class ZoneBBox:
+class ZoneBBox(BaseModel):
     south_west: GeoPoint
     north_east: GeoPoint
 
 
-@dataclass
-class Zone:
-    id: str
+class Zone(BaseModel):
+    id: Optional[str] = Field(alias="_id", default=None, exclude_none=True)
     name: str
     zone_type: ZoneType
     bbox: ZoneBBox
+    active: bool = True
     payload: Optional[Any] = None
 
-    def to_dict(self) -> Dict[str, Any]:
-        data = asdict(self)
-        data["zone_type"] = self.zone_type.value
-        if self.payload:
-            data["payload"] = asdict(self.payload)
-        return data
+    @field_validator("id", mode="before")
+    def convert_objectid_to_str(cls, v):
+        if isinstance(v, ObjectId):
+            return str(v)
+        return v
 
-    def from_dict(cls, data: dict) -> "Zone":
-        return dacite.from_dict(cls, data)
+    @field_validator("payload", mode="before")
+    def typecast_to_payload_type(cls, v, values: ValidationInfo):
+        if v:
+            fields = values.data
+            if "zone_type" in fields and fields["zone_type"] in type_mapping:
+                payload_class = type_mapping[fields["zone_type"]]
+                return payload_class(**v) if isinstance(v, dict) else v
+        return v
 
-    def set_payload(self, payload: dict):
+    def set_weather_payload(self, payload: dict):
         if self.zone_type == ZoneType.EMPTY:
             self.payload = None
         elif self.zone_type == ZoneType.WIND:
@@ -70,25 +80,23 @@ class Zone:
                 humidity=payload["main"]["humidity"],
             )
 
+        logging.info(f"Zone {self.name} updated with weather data: {self.payload}")
 
-@dataclass
-class WindPayload:
+
+class WindPayload(BaseModel):
     wind_speed: float  # meter/second
     wind_direction: float
 
 
-@dataclass
-class RainPayload:
+class RainPayload(BaseModel):
     precipitation: float  # mm/hour
 
 
-@dataclass
-class VisibilityPayload:
+class VisibilityPayload(BaseModel):
     distance: int  # meters
 
 
-@dataclass
-class TemperaturePayload:
+class TemperaturePayload(BaseModel):
     temp: float
     temp_min: float
     temp_max: float
@@ -96,11 +104,41 @@ class TemperaturePayload:
     humidity: int
 
 
+class Threshold(BaseModel):
+    limit: float
+    condition: str
+
+
+class AutoGroupPayload(BaseModel):
+    sampling_size: int
+    refresh_rate: int
+    next_refresh: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now())
+    threshold: dict[str, Threshold]
+    sub_zone_type: ZoneType
+    zones: list[Zone]
+
+
+class CreateZoneRequest(BaseModel):
+    zone_rect: list[float]
+    zone_name: str
+    zone_type: ZoneType
+
+
+class AutoGroupRequest(BaseModel):
+    name: str
+    rect: list[float]
+    sampling_size: int
+    refresh_rate: int
+    threshold: dict[str, Threshold]
+    sub_zone_type: ZoneType
+
+
 type_mapping = {
     ZoneType.WIND: WindPayload,
     ZoneType.RAIN: RainPayload,
     ZoneType.VISIBILITY: VisibilityPayload,
     ZoneType.TEMPERATURE: TemperaturePayload,
+    ZoneType.AUTO_GROUP: AutoGroupPayload,
 }
 
 
@@ -120,6 +158,6 @@ def zone_factory(zone_id: str, zone_name: str, zone_type: ZoneType, zone_bbox: Z
     )
 
     if payload:
-        zone.set_payload(payload)
+        zone.set_weather_payload(payload)
 
     return zone
