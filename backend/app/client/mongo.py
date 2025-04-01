@@ -24,20 +24,19 @@ class MongoDB(object):
         return None
 
     async def insert_zone(self, zone: Zone) -> Zone:
-        zone_dict = zone.model_dump(exclude_none=True)
-        zone_dict.pop("id", None)
+        zone_dict = zone.model_dump(exclude_none=True, exclude={"id"}, by_alias=True)
         result = await self._zones.insert_one(zone_dict)
         zone.id = str(result.inserted_id)
         return zone
 
     async def update_zone(self, zone: Zone) -> bool:
-        zone_dict = zone.model_dump(exclude_none=True)
-        zone_id = zone_dict.pop("id")
+        zone_dict = zone.model_dump(exclude_none=True, by_alias=True)
+        zone_id = zone_dict.pop("_id")
         result = await self._zones.update_one({"_id": ObjectId(zone_id)}, {"$set": zone_dict})
-        return result.modified_count > 0
+        return result.matched_count > 0
 
     async def get_all_zones(self) -> list[Zone]:
-        return [Zone.model_validate(zone_doc) for zone_doc in await self._zones.find().to_list()]
+        return [Zone(**zone_doc) for zone_doc in await self._zones.find().to_list()]
 
     async def delete_zone(self, zone_id: str) -> bool:
         result = await self._zones.delete_one({"_id": ObjectId(zone_id)})

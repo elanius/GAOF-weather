@@ -33,7 +33,7 @@ class ZoneBBox(BaseModel):
 
 
 class Zone(BaseModel):
-    id: Optional[str] = Field(alias="_id", default=None, exclude_none=True)
+    id: Optional[str] = Field(alias="_id", default=None, exclude_none=True, serialization_alias="_id")
     name: str
     zone_type: ZoneType
     bbox: ZoneBBox

@@ -16,8 +16,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-app.include_router(root.router)
-app.include_router(weather.router)
+# app.include_router(root.router)
+# app.include_router(weather.router)
 app.include_router(zones.router)
 
 origins = [

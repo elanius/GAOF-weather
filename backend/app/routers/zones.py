@@ -75,12 +75,12 @@ async def list_zones():
     out_zones = list()
     zones = await mongo_db.get_all_zones()
     for zone in zones:
-        out_zones.append(zone)
+        out_zones.append(zone.model_dump(exclude_none=True))
 
         if zone.zone_type == ZoneType.AUTO_GROUP:
             payload: AutoGroupPayload = zone.payload
             # TODO evaluate if zone is active according to threshold limits
-            out_zones.extend(payload.zones)
+            out_zones.extend([zone.model_dump(exclude_none=True) for zone in payload.zones])
 
     return out_zones
 
@@ -100,7 +100,7 @@ async def delete_zone(zone_id: str):
     """
     try:
         if await mongo_db.delete_zone(zone_id) is False:
-            return {"status": "error", "message": "Zone not found"}
+            raise HTTPException(status_code=404, detail={"status": "error", "message": "Zone not found"})
     except Exception as e:
         logger.error("Error creating zone", exc_info=e)
         raise HTTPException(status_code=500, detail={"status": "error", "message": str(e)})
@@ -139,7 +139,8 @@ async def create_zone(request: CreateZoneRequest):
 
         zone.set_weather_payload(weather)
 
-        return await mongo_db.insert_zone(zone)
+        new_zone = await mongo_db.insert_zone(zone)
+        return new_zone.model_dump(exclude_none=True)
 
     except Exception as e:
         logger.error("Error creating zone", exc_info=e)
@@ -223,27 +224,28 @@ async def edit_zone(zone_id: str, zone_type: ZoneType, zone_name: str = ""):
     """
     try:
         if (zone := await mongo_db.get_zone(zone_id)) is None:
-            return {"status": "error", "message": "Zone not found"}
+            raise HTTPException(status_code=404, detail={"status": "error", "message": "Zone not found"})
 
         update = False
         if zone.name != zone_name:
-            zone_name == zone_name
+            zone.name = zone_name
             update = True
 
         if zone.zone_type != zone_type:
             zone.zone_type = zone_type
+            if zone.zone_type in {ZoneType.WIND, ZoneType.RAIN, ZoneType.VISIBILITY, ZoneType.TEMPERATURE}:
+                weather = await get_weather_by_bbox(zone.bbox)
+                zone.set_weather_payload(weather)
             update = True
 
         if update:
             if await mongo_db.update_zone(zone) is False:
-                return {"status": "error", "message": "Zone not found"}
-        else:
-            return {"status": "success", "message": "No changes to update"}
+                raise HTTPException(status_code=404, detail={"status": "error", "message": "Zone not found"})
     except Exception as e:
         logger.error("Error creating zone", exc_info=e)
         raise HTTPException(status_code=500, detail={"status": "error", "message": str(e)})
 
-    return zone
+    return zone.model_dump(exclude_none=True)
 
 
 @router.put("/refresh_zone")
