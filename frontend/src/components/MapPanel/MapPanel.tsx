@@ -1,9 +1,38 @@
 import React, { useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, Rectangle } from "react-leaflet";
 import L, { latLngBounds, Map } from "leaflet";
-import { useZoneContext } from "../../context/ZoneContext";
+import { useZoneContext, Zone } from "../../context/ZoneContext";
 import "leaflet/dist/leaflet.css";
 import "./MapPanel.css";
+
+const getZoneColor = (zone: Zone, selectedZoneId: string) => {
+    if (selectedZoneId === zone.id) {
+        return {
+            color: "red",
+            weight: 2,
+        };
+    }
+
+    if (zone.active == false) {
+        return {
+            color: "gray",
+            weight: 2,
+        };
+    }
+
+    if (zone.type == "auto_group") {
+        return {
+            color: "#1fe053",
+            weight: 2,
+            fillColor: "none",
+        };
+    }
+
+    return {
+        color: "blue",
+        weight: 2,
+    };
+};
 
 const MapPanel: React.FC = () => {
     const { zones, selectedZoneId, isCreatingZone, isLocalizingZone, addNewZone, selectZone, localizeZone } =
@@ -91,10 +120,7 @@ const MapPanel: React.FC = () => {
                 <Rectangle
                     key={id}
                     bounds={zone.bounds}
-                    pathOptions={{
-                        color: selectedZoneId === id ? "red" : "blue",
-                        weight: 2,
-                    }}
+                    pathOptions={getZoneColor(zone, selectedZoneId || "")}
                     eventHandlers={{
                         click: () => selectZone(id),
                     }}

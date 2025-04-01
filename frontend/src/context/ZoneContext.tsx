@@ -10,12 +10,14 @@ export enum ZoneType {
     rain = "rain",
     visibility = "visibility",
     temperature = "temperature",
+    auto_group = "auto_group",
 }
 
-type Zone = {
+export type Zone = {
     id: string;
     name: string;
     bounds: LatLngBounds;
+    active: boolean;
     isEditing: boolean;
     isCreating: boolean;
     type: ZoneType;
@@ -58,6 +60,7 @@ export const ZoneProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         [zone.bbox.south_west.lat, zone.bbox.south_west.lon],
                         [zone.bbox.north_east.lat, zone.bbox.north_east.lon]
                     ),
+                    active: zone.active,
                     isEditing: false,
                     isCreating: false,
                     type: zone.zone_type as ZoneType,
@@ -83,16 +86,17 @@ export const ZoneProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         try {
             const response = await axios.post(
                 "/create_zone",
-                [
-                    bounds.getSouthWest().lat,
-                    bounds.getSouthWest().lng,
-                    bounds.getNorthEast().lat,
-                    bounds.getNorthEast().lng,
-                ],
                 {
-                    params: {
-                        zone_type: ZoneType.empty,
-                    },
+                    zone_rect: [
+                        bounds.getSouthWest().lat,
+                        bounds.getSouthWest().lng,
+                        bounds.getNorthEast().lat,
+                        bounds.getNorthEast().lng,
+                    ],
+                    zone_name: "New Zone",
+                    zone_type: ZoneType.empty,
+                },
+                {
                     headers: {
                         "Content-Type": "application/json",
                     },
@@ -137,7 +141,16 @@ export const ZoneProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const editZone = async (id: string, newName: string, newType: ZoneType) => {
         try {
-            const response = await axios.put(`/edit_zone?zone_id=${id}&zone_name=${newName}&zone_type=${newType}`);
+            const response = await axios.put(`/edit_zone`, null, {
+                params: {
+                    zone_id: id,
+                    zone_name: newName,
+                    zone_type: newType,
+                },
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            });
             const updatedZone = response.data;
             setZones({
                 ...zones,
