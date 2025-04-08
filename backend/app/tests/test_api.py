@@ -5,6 +5,7 @@ from app.types.zone_types import (
     AutoGroupPayload,
     AutoGroupRequest,
     CreateZoneRequest,
+    Restriction,
     Threshold,
     Zone,
     ZoneType,
@@ -17,16 +18,30 @@ def test_near_zones(zone_client: ZoneClient, zone_collection: Collection, auto_g
     assert len(zones) == 1
     found_zone = zones[0]
     assert found_zone.zone_type == ZoneType.TEMPERATURE
-    assert found_zone.name == "temperature-group_2_0"
-    assert found_zone.active is True
+    assert found_zone.name == "temperature-group_0_0"
+    assert found_zone.active is False
 
 
-def test_near_zones_include_inactive(zone_client: ZoneClient, zone_collection: Collection, auto_group_zone: Zone):
-    zones = zone_client.get_near_zones(lat=51.5577, lon=0.3871, radius=10000, include_inactive=True)
-    assert len(zones) == 3
+def test_near_zone_with_restrictions(zone_client: ZoneClient, zone_collection: Collection, auto_group_zone: Zone):
+    zones = zone_client.get_near_zones(
+        lat=51.5577,
+        lon=0.3871,
+        radius=10000,
+        restrictions=[
+            Restriction(name="temp", limit=6.6, condition=">"),
+            Restriction(name="humidity", limit=65, condition=">="),
+        ],
+    )
+    assert len(zones) == 2
+    found_zone = zones[0]
+    assert found_zone.zone_type == ZoneType.TEMPERATURE
+    assert found_zone.name == "temperature-group_0_0"
+    assert found_zone.active is False
 
-    for zone in zones:
-        assert zone in auto_group_zone.payload.zones
+    found_zone = zones[1]
+    assert found_zone.zone_type == ZoneType.TEMPERATURE
+    assert found_zone.name == "temperature-group_1_0"
+    assert found_zone.active is False
 
 
 def test_list_zones(zone_client: ZoneClient, default_zones: list[Zone]):

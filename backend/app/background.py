@@ -9,6 +9,9 @@ logger = logging.getLogger(__name__)
 
 
 class Background:
+    _refresh_event = asyncio.Event()
+    WAKEUP_TIMEOUT = 60
+
     def __init__(self):
         self._shutdown_event = asyncio.Event()
         self._background_task: asyncio.Task = None
@@ -21,6 +24,23 @@ class Background:
         self._shutdown_event.set()
         await self._background_task
 
+    @classmethod
+    def refresh_zones(cls):
+        cls._refresh_event.set()
+
+    async def _event_aware_wait(self, timeout) -> bool:
+        countdown = timeout
+        while countdown > 0:
+            await asyncio.sleep(1)
+            countdown -= 1
+            if self._shutdown_event.is_set():
+                return False
+            elif self._refresh_event.is_set():
+                self._refresh_event.clear()
+                return True
+
+        return True
+
     def _load_zones_for_refresh(self):
         return mongo_db._zones.find(
             {
@@ -30,19 +50,15 @@ class Background:
         )
 
     async def run(self):
-        while not self._shutdown_event.is_set():
+        while await self._event_aware_wait(Background.WAKEUP_TIMEOUT):
             async for zone_doc in self._load_zones_for_refresh():
                 zone = Zone(**zone_doc)
                 logging.info(f"Refreshing weather for zone {zone.name} - {str(zone.id)}")
                 payload: AutoGroupPayload = zone.payload
                 await self._refresh_zone_weather(payload.zones)
-                self._evaluate_weather_thresholds(payload.zones, payload.threshold)
+                # self._evaluate_weather_thresholds(payload.zones, payload.threshold)
                 payload.next_refresh = datetime.datetime.now() + datetime.timedelta(seconds=payload.refresh_rate)
                 await mongo_db.update_zone(zone)
-
-            # sleep some time before next refresh attempt
-            # TODO this could be optimized to sleep until the next zone needs to be refreshed
-            await asyncio.sleep(60)
 
     async def _refresh_zone_weather(self, zones: list[Zone]):
         for zone in zones:

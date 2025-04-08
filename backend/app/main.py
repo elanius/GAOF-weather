@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from app.routers import root, weather, zones
+from app.routers import zones
+
 from app.background import Background
 
 
@@ -11,13 +12,12 @@ async def lifespan(app: FastAPI):
     async with Background():
         yield
 
-    # teardown
+
+# teardown
 
 
 app = FastAPI(lifespan=lifespan)
 
-# app.include_router(root.router)
-# app.include_router(weather.router)
 app.include_router(zones.router)
 
 origins = [

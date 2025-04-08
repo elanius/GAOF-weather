@@ -1,6 +1,6 @@
 import logging
 from fastapi.testclient import TestClient
-from app.types.zone_types import AutoGroupRequest, CreateZoneRequest, Zone
+from app.types.zone_types import AutoGroupRequest, CreateZoneRequest, Restriction, Zone
 from typing import List, Dict
 
 logger = logging.getLogger(__name__)
@@ -10,15 +10,15 @@ class ZoneClient:
     def __init__(self, client: TestClient):
         self.client = client
 
-    def get_near_zones(self, lat: float, lon: float, radius: float, include_inactive: bool = False) -> List[Zone]:
-        response = self.client.get(
+    def get_near_zones(self, lat: float, lon: float, radius: float, restrictions: list[Restriction] = []) -> List[Zone]:
+        response = self.client.post(
             "/near_zones",
             params={
                 "lat": lat,
                 "lon": lon,
                 "radius": radius,
-                "include_inactive": include_inactive,
             },
+            json=[restriction.model_dump() for restriction in restrictions] if restrictions else None,
         )
         response.raise_for_status()
         return [Zone(**zone) for zone in response.json()]

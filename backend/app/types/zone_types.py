@@ -56,7 +56,7 @@ class Zone(BaseModel):
         return v
 
     def set_weather_payload(self, payload: dict):
-        if self.zone_type == ZoneType.EMPTY:
+        if self.zone_type == ZoneType.EMPTY or not payload:
             self.payload = None
         elif self.zone_type == ZoneType.WIND:
             self.payload = WindPayload(
@@ -113,7 +113,7 @@ class AutoGroupPayload(BaseModel):
     sampling_size: int
     refresh_rate: int
     next_refresh: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now())
-    threshold: dict[str, Threshold]
+    # threshold: dict[str, Threshold]
     sub_zone_type: ZoneType
     zones: list[Zone]
 
@@ -129,8 +129,37 @@ class AutoGroupRequest(BaseModel):
     rect: list[float]
     sampling_size: int
     refresh_rate: int
-    threshold: dict[str, Threshold]
     sub_zone_type: ZoneType
+
+
+class LocalSituationRequest(BaseModel):
+    lat: float
+    lon: float
+    width: int
+    height: int
+    sampling_size: int
+    refresh_rate: int
+    weather_types: list[ZoneType]
+
+
+class Restriction(BaseModel):
+    """
+    Restriction defines condition when zone is activated.
+    Activated zone means that conditions inside zone are not suitable for a drone.
+    Evaluation of zone is done by comparing zone attribute in payload with limit.
+
+        active = zone.payload[zone_attribute] (condition operator) limit
+        e.g. active = zone.payload["precipitation"] > 2.5
+
+    Attributes:
+        name (str): The name of the zone attribute which is compared to limit.
+        limit (float): The numerical limit associated with the restriction.
+        condition (str): The condition under which the restriction applies.
+    """
+
+    name: str
+    limit: float
+    condition: str
 
 
 type_mapping = {

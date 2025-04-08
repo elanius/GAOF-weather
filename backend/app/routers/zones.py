@@ -1,35 +1,43 @@
 import math
 import logging
 from fastapi import APIRouter, HTTPException
+from geopy.distance import geodesic
+from bson import ObjectId
+
 from app.types.zone_types import (
     AutoGroupPayload,
     AutoGroupRequest,
     CreateZoneRequest,
+    LocalSituationRequest,
+    Restriction,
     Zone,
     ZoneType,
     create_zone_bbox,
 )
 from app.client.weather import get_weather_by_bbox
 from app.client.mongo import mongo_db
-from geopy.distance import geodesic
-from bson import ObjectId
+from app.zone_filters import filter_by_radius, filter_by_restrictions
+from app.background import Background
+
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/near_zones")
-async def near_zones(lat: float, lon: float, radius: float, include_inactive: bool = False):
+@router.post("/near_zones")
+async def near_zones(lat: float, lon: float, radius: float, restrictions: list[Restriction] = []):
     """
     Find zones within a specified radius of a given latitude and longitude.
 
     Args:
         lat (float): The latitude of the point to search around.
         lon (float): The longitude of the point to search around.
-        radius (float): The radius within which to search for zones.
-        include_inactive (bool): Whether to include inactive zones in the search.
+        radius (float): The radius within which to search for zones in meters.
+        restrictions (list[Restriction]): A list of restrictions to filter the zones.
+
     Returns:
-        list: A list of zones that are within the specified radius of the given point.
+        list: A list of zones that are within the specified radius of the given point,
+              optionally filtered by the provided restrictions.
     """
 
     zones = await mongo_db.get_all_zones()
@@ -40,27 +48,11 @@ async def near_zones(lat: float, lon: float, radius: float, include_inactive: bo
         else:
             expanded_zones.append(zone)
 
-    zones_in_radius = []
-    for zone in expanded_zones:
-        if zone.active or include_inactive:
-            if is_zone_in_radius(zone, lat, lon, radius):
-                zones_in_radius.append(zone)
-
-    return zones_in_radius
-
-
-def is_zone_in_radius(zone: Zone, lat: float, lon: float, radius: float):
-    zone_center_lat = (zone.bbox.south_west.lat + zone.bbox.north_east.lat) / 2
-    zone_center_lon = (zone.bbox.south_west.lon + zone.bbox.north_east.lon) / 2
-    zone_radius = (
-        geodesic(
-            (zone.bbox.south_west.lat, zone.bbox.south_west.lon), (zone.bbox.north_east.lat, zone.bbox.north_east.lon)
-        ).meters
-        / 2
-    )
-    distance = geodesic((lat, lon), (zone_center_lat, zone_center_lon)).meters
-
-    return distance <= radius + zone_radius
+    zones_in_radius = filter_by_radius(expanded_zones, lat, lon, radius)
+    if restrictions:
+        return filter_by_restrictions(zones_in_radius, restrictions)
+    else:
+        return zones_in_radius
 
 
 @router.get("/list_zones")
@@ -150,6 +142,18 @@ async def create_zone(request: CreateZoneRequest):
 @router.post("/create_auto_group_zone")
 async def create_auto_group_zone(request: AutoGroupRequest):
     try:
+        if request.sampling_size < 1000:
+            raise HTTPException(
+                status_code=400,
+                detail={"status": "error", "message": "Sampling size must be greater than 1000."},
+            )
+
+        if request.refresh_rate < 600:
+            raise HTTPException(
+                status_code=400,
+                detail={"status": "error", "message": "Refresh rate must be greater than 600."},
+            )
+
         zone = Zone(
             name=request.name,
             zone_type=ZoneType.AUTO_GROUP,
@@ -159,15 +163,16 @@ async def create_auto_group_zone(request: AutoGroupRequest):
         payload = AutoGroupPayload(
             sampling_size=request.sampling_size,
             refresh_rate=request.refresh_rate,
-            threshold=request.threshold,
             sub_zone_type=request.sub_zone_type,
             zones=create_sub_zones(request.name, request.sub_zone_type, request.rect, request.sampling_size),
         )
 
         zone.payload = payload
-        return await mongo_db.insert_zone(zone)
+        await mongo_db.insert_zone(zone)
 
-        # TODO notify weather refresh background task about new auto group zone
+        Background.refresh_zones()
+
+        return zone
 
     except Exception as e:
         logger.error("Error creating zone", exc_info=e)
@@ -276,3 +281,44 @@ async def refresh_zone(zone_id: str):
         raise HTTPException(status_code=500, detail={"status": "error", "message": str(e)})
 
     return zone
+
+
+@router.post("/local_situation")
+async def local_situation(request: LocalSituationRequest):
+    try:
+        # Validate weather types
+        valid_weather_types = {ZoneType.WIND, ZoneType.RAIN, ZoneType.VISIBILITY, ZoneType.TEMPERATURE}
+        if not set(request.weather_types).issubset(valid_weather_types):
+            raise HTTPException(
+                status_code=400,
+                detail={"status": "error", "message": "Invalid weather types provided."},
+            )
+
+        # Calculate rectangle bounds
+        half_width_deg = (request.width / 2) / (111320 * math.cos(math.radians(request.lat)))
+        half_height_deg = (request.height / 2) / 111320
+        rect = [
+            request.lat - half_height_deg,
+            request.lon - half_width_deg,
+            request.lat + half_height_deg,
+            request.lon + half_width_deg,
+        ]
+
+        created_zones = []
+        for weather_type in request.weather_types:
+            zone_name = f"local_{weather_type.value}"
+            request = AutoGroupRequest(
+                name=zone_name,
+                rect=rect,
+                sampling_size=request.sampling_size,
+                refresh_rate=request.refresh_rate,
+                sub_zone_type=weather_type,
+            )
+            created_zone = await create_auto_group_zone(request)
+            created_zones.append(created_zone)
+
+        return created_zones
+
+    except Exception as e:
+        logger.error("Error creating local situation zones", exc_info=e)
+        raise HTTPException(status_code=500, detail={"status": "error", "message": str(e)})

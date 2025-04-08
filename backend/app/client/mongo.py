@@ -12,6 +12,9 @@ MONGODB_CONNECTION_STRING = os.getenv("MONGODB_CONNECTION_STRING")
 
 class MongoDB(object):
     def __init__(self) -> None:
+        if not MONGODB_CONNECTION_STRING:
+            raise ValueError("MONGODB_CONNECTION_STRING is not set. Please set it in your environment variables.")
+
         self._client = AsyncIOMotorClient(MONGODB_CONNECTION_STRING, uuidRepresentation="standard")
         self._db = self._client["gaof-db"]
         self._zones = self._db["zones"]
