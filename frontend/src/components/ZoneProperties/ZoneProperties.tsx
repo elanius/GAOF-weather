@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import "./ZoneProperties.css";
+import "../SidePanel/SidePanel.css";
 import "../../styles/ButtonStyles.css";
 import { useZoneContext, ZoneType } from "../../context/ZoneContext";
 import ZoneProperty from "./ZoneProperty";
@@ -92,7 +92,7 @@ const ZoneProperties: React.FC = () => {
                                     <button onClick={handleSave} className="button accept">
                                         {zone.isCreating ? "Create" : "Save"}
                                     </button>
-                                    <button onClick={handleCancel} className="button delete">
+                                    <button onClick={handleCancel} className="button cancel">
                                         Cancel
                                     </button>
                                 </td>

@@ -69,11 +69,6 @@ async def list_zones():
     for zone in zones:
         out_zones.append(zone.model_dump(exclude_none=True))
 
-        if zone.zone_type == ZoneType.AUTO_GROUP:
-            payload: AutoGroupPayload = zone.payload
-            # TODO evaluate if zone is active according to threshold limits
-            out_zones.extend([zone.model_dump(exclude_none=True) for zone in payload.zones])
-
     return out_zones
 
 

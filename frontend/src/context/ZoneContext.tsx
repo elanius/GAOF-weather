@@ -26,6 +26,7 @@ export type Zone = {
 
 type ZoneContextType = {
     zones: { [id: string]: Zone };
+    exp_zones: { [id: string]: Zone };
     selectedZoneId: string | null;
     isCreatingZone: boolean;
     isLocalizingZone: boolean;
@@ -68,6 +69,7 @@ export const ZoneProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 };
                 return acc;
             }, {});
+
             setZones(zonesMap);
         } catch (error) {
             console.error("Error fetching zones:", error);
@@ -103,22 +105,25 @@ export const ZoneProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 }
             );
             const newZone = response.data;
+            const zoneObject = {
+                id: newZone.id,
+                name: newZone.name,
+                bounds: new LatLngBounds(
+                    [newZone.bbox.south_west.lat, newZone.bbox.south_west.lon],
+                    [newZone.bbox.north_east.lat, newZone.bbox.north_east.lon]
+                ),
+                isEditing: true,
+                isCreating: true,
+                type: newZone.zone_type,
+                payload: newZone.payload,
+            };
+
             setZones((prevZones) => ({
                 ...prevZones,
-                [newZone.id]: {
-                    id: newZone.id,
-                    name: newZone.name,
-                    bounds: new LatLngBounds(
-                        [newZone.bbox.south_west.lat, newZone.bbox.south_west.lon],
-                        [newZone.bbox.north_east.lat, newZone.bbox.north_east.lon]
-                    ),
-                    isEditing: true,
-                    isCreating: true,
-                    type: newZone.zone_type,
-                    payload: newZone.payload,
-                },
+                [newZone.id]: zoneObject,
             }));
-            selectZone(newZone.id);
+
+            selectZone(newZone.id); // Ensure the new zone is selected
         } catch (error) {
             console.error("Error creating zone:", error);
         }
@@ -194,7 +199,7 @@ export const ZoneProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     const selectedZone = () => {
-        return selectedZoneId ? zones[selectedZoneId] : null;
+        return selectedZoneId ? getExpandedZones(zones)[selectedZoneId] : null;
     };
 
     const localizeZone = (id: string, enable: boolean = true) => {
@@ -206,6 +211,7 @@ export const ZoneProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         <ZoneContext.Provider
             value={{
                 zones,
+                exp_zones: getExpandedZones(zones), // Replace exp_zones with dynamic function
                 selectedZoneId,
                 isCreatingZone,
                 isLocalizingZone,
@@ -230,4 +236,28 @@ export const useZoneContext = () => {
         throw new Error("useZoneContext must be used within a ZoneProvider");
     }
     return context;
+};
+
+export const getExpandedZones = (zones: { [id: string]: Zone }) => {
+    const expandedZones = { ...zones };
+    Object.values(zones).forEach((zone) => {
+        if (zone.type === ZoneType.auto_group && zone.payload?.zones) {
+            zone.payload.zones.forEach((subZone: any) => {
+                expandedZones[subZone.id] = {
+                    id: subZone.id,
+                    name: subZone.name,
+                    bounds: new LatLngBounds(
+                        [subZone.bbox.south_west.lat, subZone.bbox.south_west.lon],
+                        [subZone.bbox.north_east.lat, subZone.bbox.north_east.lon]
+                    ),
+                    active: subZone.active,
+                    isEditing: false,
+                    isCreating: false,
+                    type: subZone.zone_type as ZoneType,
+                    payload: subZone.payload,
+                };
+            });
+        }
+    });
+    return expandedZones;
 };

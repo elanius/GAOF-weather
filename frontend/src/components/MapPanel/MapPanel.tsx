@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
-import { MapContainer, TileLayer, Rectangle } from "react-leaflet";
+import { MapContainer, TileLayer, Rectangle, Marker, Popup } from "react-leaflet";
 import L, { latLngBounds, Map } from "leaflet";
-import { useZoneContext, Zone } from "../../context/ZoneContext";
+import { useZoneContext, Zone, getExpandedZones } from "../../context/ZoneContext";
+import { usePositionContext } from "../../context/PositionContext";
+import { useMeasureContext } from "../../context/MeasureContext";
 import "leaflet/dist/leaflet.css";
 import "./MapPanel.css";
 
@@ -37,11 +39,22 @@ const getZoneColor = (zone: Zone, selectedZoneId: string) => {
 const MapPanel: React.FC = () => {
     const { zones, selectedZoneId, isCreatingZone, isLocalizingZone, addNewZone, selectZone, localizeZone } =
         useZoneContext();
+    const {
+        positionMarks,
+        isCreatingPosition,
+        isLocalizingMark,
+        selectedPositionId,
+        addPositionMark,
+        localizeMark,
+        creatingPosition,
+    } = usePositionContext();
+    const { isCreatingMeasure, addMeasurement } = useMeasureContext();
     const mapRef = useRef<Map | null>(null);
     const [waitForAccept, setWaitForAccept] = useState(false);
+    const [tempLine, setTempLine] = useState<L.Polyline | null>(null);
+    const [startPoint, setStartPoint] = useState<L.LatLng | null>(null);
 
     useEffect(() => {
-        console.log("map - isCreatingZone: ", isCreatingZone);
         if (!mapRef.current) return;
         const map = mapRef.current;
 
@@ -93,17 +106,122 @@ const MapPanel: React.FC = () => {
     useEffect(() => {
         if (!mapRef.current || !selectedZoneId || !isLocalizingZone) return;
         const map = mapRef.current;
-        const zone = zones[selectedZoneId];
+        const zone = getExpandedZones(zones)[selectedZoneId];
         if (zone) {
             const bounds = zone.bounds;
             map.fitBounds(bounds, { padding: [200, 200] }); // Add padding to zoom out a little bit
+        } else {
+            console.warn(`Zone with ID ${selectedZoneId} not found in expanded zones.`);
         }
         localizeZone(selectedZoneId, false);
     }, [selectedZoneId, zones, isLocalizingZone]);
 
+    useEffect(() => {
+        if (!mapRef.current || !selectedPositionId || !isLocalizingMark) return;
+        const map = mapRef.current;
+        const mark = positionMarks[selectedPositionId];
+        if (mark) {
+            const bounds = L.latLng(mark.lat, mark.lon);
+            map.setView(bounds, map.getZoom(), { animate: true }); // Focus on the mark position with animation
+        }
+        localizeMark(selectedPositionId, false);
+    }, [selectedPositionId, positionMarks, isLocalizingMark]);
+
+    useEffect(() => {
+        if (!mapRef.current) return;
+        const map = mapRef.current;
+
+        if (isCreatingPosition) {
+            map.dragging.disable();
+            map.doubleClickZoom.disable();
+            map.scrollWheelZoom.disable();
+        } else {
+            map.dragging.enable();
+            map.doubleClickZoom.enable();
+            map.scrollWheelZoom.enable();
+        }
+
+        const handleMapClick = (e: L.LeafletMouseEvent) => {
+            if (isCreatingPosition) {
+                addPositionMark("New Position", e.latlng.lat, e.latlng.lng);
+                creatingPosition(false); // Disable creating position after a mark is created
+            }
+        };
+
+        map.on("click", handleMapClick);
+
+        return () => {
+            map.off("click", handleMapClick);
+            map.dragging.enable();
+            map.doubleClickZoom.enable();
+            map.scrollWheelZoom.enable();
+        };
+    }, [isCreatingPosition, addPositionMark]);
+
+    useEffect(() => {
+        if (!mapRef.current) return;
+        const map = mapRef.current;
+
+        if (isCreatingMeasure) {
+            map.dragging.disable();
+            map.doubleClickZoom.disable();
+            map.scrollWheelZoom.disable();
+        } else {
+            map.dragging.enable();
+            map.doubleClickZoom.enable();
+            map.scrollWheelZoom.enable();
+            if (tempLine) {
+                map.removeLayer(tempLine);
+                setTempLine(null);
+                setStartPoint(null);
+            }
+        }
+
+        const handleMouseDown = (e: L.LeafletMouseEvent) => {
+            if (!isCreatingMeasure) return;
+
+            const start = e.latlng;
+            setStartPoint(start);
+
+            const newLine = L.polyline([start, start], { color: "blue", weight: 2 }).addTo(map);
+            setTempLine(newLine);
+        };
+
+        const handleMouseMove = (e: L.LeafletMouseEvent) => {
+            if (!isCreatingMeasure || !startPoint || !tempLine) return;
+
+            const currentPoint = e.latlng;
+            tempLine.setLatLngs([startPoint, currentPoint]);
+        };
+
+        const handleMouseUp = (e: L.LeafletMouseEvent) => {
+            if (!isCreatingMeasure || !startPoint || !tempLine) return;
+
+            const endPoint = e.latlng;
+            addMeasurement([startPoint, endPoint]);
+
+            map.removeLayer(tempLine);
+            setTempLine(null);
+            setStartPoint(null);
+        };
+
+        map.on("mousedown", handleMouseDown);
+        map.on("mousemove", handleMouseMove);
+        map.on("mouseup", handleMouseUp);
+
+        return () => {
+            map.off("mousedown", handleMouseDown);
+            map.off("mousemove", handleMouseMove);
+            map.off("mouseup", handleMouseUp);
+            map.dragging.enable();
+            map.doubleClickZoom.enable();
+            map.scrollWheelZoom.enable();
+        };
+    }, [isCreatingMeasure, tempLine, startPoint, addMeasurement]);
+
     return (
         <MapContainer
-            center={[51.505, -0.09]}
+            center={[48.946518848754174, 21.16296710612785]}
             zoom={13}
             style={{ height: "100%", width: "100%" }}
             ref={(mapInstance) => {
@@ -116,7 +234,7 @@ const MapPanel: React.FC = () => {
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            {Object.entries(zones).map(([id, zone]) => (
+            {Object.entries(getExpandedZones(zones)).map(([id, zone]) => (
                 <Rectangle
                     key={id}
                     bounds={zone.bounds}
@@ -125,6 +243,17 @@ const MapPanel: React.FC = () => {
                         click: () => selectZone(id),
                     }}
                 />
+            ))}
+            {Object.values(positionMarks).map((mark) => (
+                <Marker
+                    key={mark.id}
+                    position={[mark.lat, mark.lon]}
+                    // eventHandlers={{
+                    //     click: () => focusPositionMark(mark.id),
+                    // }}
+                >
+                    <Popup>{mark.name}</Popup>
+                </Marker>
             ))}
         </MapContainer>
     );
